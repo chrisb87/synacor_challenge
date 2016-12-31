@@ -11,7 +11,7 @@ class MagicMachine(object):
 		'add', 'mult', 'mod', 'and', 'or', 'not', 'rmem', 'wmem', 'call', 
 		'ret', 'out', 'in', 'noop')
 
-	ADMIN_COMMANDS = ('memdump')
+	ADMIN_COMMANDS = ('memdump', 'quit')
 
 	def __init__(self):
 		self.memory = [0 for _ in xrange(2**15)]
@@ -38,7 +38,7 @@ class MagicMachine(object):
 			for line in f:
 				self.autoinput.append(line.strip())
 
-	def memdump(self, filename = None):
+	def admin_memdump(self, filename = None):
 		n = 0
 
 		if filename is None:
@@ -67,6 +67,9 @@ class MagicMachine(object):
 			for n in xrange(2**15):
 				f.write("%05d: %d\n" % (n, self.memory[n]))
 
+	def admin_quit(self):
+		raise self.Halt()
+
 	def run(self, start_address = 0):
 		self.address = start_address
 
@@ -87,7 +90,6 @@ class MagicMachine(object):
 					self.address += 1
 
 			except self.Halt:
-				print "HALT at %d" % self.address
 				break
 
 	def lookup(self, value):
@@ -189,7 +191,7 @@ class MagicMachine(object):
 
 				while command.split()[0] in self.ADMIN_COMMANDS:
 					split = command.split()
-					getattr(self, split[0])(*split[1:])
+					getattr(self, "admin_%s" % split[0])(*split[1:])
 					command = raw_input(prompt)
 
 			self.input_buffer = (c for c in command)
