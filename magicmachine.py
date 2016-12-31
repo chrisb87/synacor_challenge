@@ -183,7 +183,7 @@ class MagicMachine(object):
 		prompt = "> "
 
 		if self.input_buffer is None:
-			if len(self.autoinput) > 0:
+			if len(self.autoinput) > 0 and self.autoinput[0] != '---':
 				command = self.autoinput.popleft()
 				print "(auto) %s%s" % (prompt, command)
 			else:
