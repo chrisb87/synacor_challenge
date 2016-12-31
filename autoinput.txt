@@ -12,3 +12,6 @@ west
 west
 passage
 ladder
+west
+south
+north

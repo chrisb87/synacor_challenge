@@ -2,7 +2,7 @@ import pdb
 import os
 import sys
 from itertools import izip_longest
-from collections import defaultdict, deque
+from collections import deque
 
 class MagicMachine(object):
 	class Halt(Exception): pass
@@ -14,24 +14,24 @@ class MagicMachine(object):
 	ADMIN_COMMANDS = ('memdump')
 
 	def __init__(self):
-		self.memory = defaultdict(lambda: 0)
-		self.registers = defaultdict(lambda: 0)
+		self.memory = [0 for _ in xrange(2**15)]
+		self.registers = [0 for _ in xrange(8)]
 		self.stack = deque()
 		self.input_buffer = None
 		self.autoinput = deque()
 
-	def load(self, program):
-		for address, operation in enumerate(program.split(',')):
-			self.memory[address] = int(operation)
+		self.operations = []
+		for opcode in self.OPCODES:
+			op = getattr(self, "op_%s" % opcode)
+			self.operations.append((op, op.__code__.co_argcount - 1))
 
 	def load_bin(self, filename):
 		with open(filename, "rb") as f:
 			data = f.read()
-		data = map(lambda b: ord(b), data)
-		itr = iter(data)
 
+		itr = iter(data)
 		for address, (bit1, bit2) in enumerate(izip_longest(itr, itr)):
-			self.memory[address] = bit1 + (bit2 * (2**8))
+			self.memory[address] = ord(bit1) + (ord(bit2) * (2**8))
 
 	def load_autoinput(self, filename):
 		with open(filename, "r") as f:
@@ -67,33 +67,33 @@ class MagicMachine(object):
 			for n in xrange(2**15):
 				f.write("%05d: %d\n" % (n, self.memory[n]))
 
-
 	def run(self, start_address = 0):
 		self.address = start_address
 
 		while self.address < (2 ** 15):
-			opnum = self.lookup(self.memory[self.address])
-			opname = self.OPCODES[opnum]
-			operation = getattr(self, "op_%s" % opname)
-			argcount = operation.__code__.co_argcount - 1
+			opnum = self.memory[self.address]
+			operation, argcount = self.operations[opnum]
 
 			opargs = []
-			for argn in xrange(argcount):
+			for _ in xrange(argcount):
 				self.address += 1
 				arg = self.memory[self.address]
 				opargs.append(arg)
 
 			try:
-				operation(*opargs)
-				self.address += 1
+				result = operation(*opargs)
+
+				if result != 'jmp':
+					self.address += 1
+
 			except self.Halt:
 				print "HALT at %d" % self.address
 				break
 
 	def lookup(self, value):
-		if value >= 32776 or value < 0:
+		if value >= (2**15 + 8) or value < 0:
 			raise ValueError(value)
-		elif value >= 32768:
+		elif value >= (2**15):
 			return self.registers[self.to_register(value)]
 		else:
 			return value
@@ -122,15 +122,16 @@ class MagicMachine(object):
 		self.op_set(a, val)
 
 	def op_jmp(self, a):
-		self.address = self.lookup(a) - 1
+		self.address = self.lookup(a)
+		return 'jmp'
 
 	def op_jt(self, a, b):
 		if self.lookup(a) != 0:
-			self.op_jmp(b)
+			return self.op_jmp(b)
 
 	def op_jf(self, a, b):
 		if self.lookup(a) == 0:
-			self.op_jmp(b)
+			return self.op_jmp(b)
 
 	def op_add(self, a, b, c):
 		val = (self.lookup(b) + self.lookup(c)) % (2**15)
@@ -166,12 +167,12 @@ class MagicMachine(object):
 
 	def op_call(self, a):
 		self.stack.append(self.address + 1)
-		self.op_jmp(a)
+		return self.op_jmp(a)
 
 	def op_ret(self):
 		if len(self.stack) == 0:
 			self.op_halt()
-		self.op_jmp(self.stack.pop())
+		return self.op_jmp(self.stack.pop())
 
 	def op_out(self, a):
 		sys.stdout.write(chr(self.lookup(a)))
