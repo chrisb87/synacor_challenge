@@ -3,6 +3,7 @@ import os
 import sys
 from itertools import izip_longest
 from collections import deque
+from datetime import datetime
 
 class MagicMachine(object):
 	class Halt(Exception): pass
@@ -11,7 +12,8 @@ class MagicMachine(object):
 		'add', 'mult', 'mod', 'and', 'or', 'not', 'rmem', 'wmem', 'call', 
 		'ret', 'out', 'in', 'noop')
 
-	ADMIN_COMMANDS = ('memdump', 'quit')
+	ADMIN_COMMANDS = ('memdump', 'quit', 'registers', 'set_register', 
+		'record', 'stop_recording', 'fix teleporter')
 
 	def __init__(self):
 		self.memory = [0 for _ in xrange(2**15)]
@@ -19,6 +21,7 @@ class MagicMachine(object):
 		self.stack = deque()
 		self.input_buffer = None
 		self.autoinput = deque()
+		self.recording = False
 
 		self.operations = []
 		for opcode in self.OPCODES:
@@ -37,6 +40,30 @@ class MagicMachine(object):
 		with open(filename, "r") as f:
 			for line in f:
 				self.autoinput.append(line.strip())
+
+	def admin_record(self):
+		print "recording..."
+		self.recording = True
+
+		with open("record.txt", "w") as f:
+			f.write("started recording at %s\n" % \
+				datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
+	def admin_stop_recording(self):
+		print "stoped recording"
+		self.recording = False
+
+	def admin_registers(self):
+		print self.registers
+
+	def admin_set_register(self, register, value):
+		print "setting register %s to %s" % (register, value)
+		self.registers[int(register)] = int(value)
+
+	def admin_fix_teleporter(self):
+		self.registers[7] = 5
+		self.memory[6027:6030] = [1, 32769, 32775] # r1 = r7
+		self.memory[6030:6034] = [9, 32768, 32769, 1] # r0 = r1 + 1
 
 	def admin_memdump(self, filename = None):
 		n = 0
@@ -74,6 +101,7 @@ class MagicMachine(object):
 		self.address = start_address
 
 		while self.address < (2 ** 15):
+			opaddr = self.address
 			opnum = self.memory[self.address]
 			operation, argcount = self.operations[opnum]
 
@@ -82,6 +110,21 @@ class MagicMachine(object):
 				self.address += 1
 				arg = self.memory[self.address]
 				opargs.append(arg)
+
+			if self.recording:
+				with open("record.txt", "a") as f:
+					f.write("%05d " % opaddr)
+					f.write(self.OPCODES[opnum])
+
+					for arg in opargs:
+						f.write(' ')
+
+						if arg >= (2**15):
+							f.write("reg%d" % (arg%2**15))
+						else:
+							f.write("%d" % arg)
+
+					f.write('\n')
 
 			try:
 				result = operation(*opargs)
@@ -189,10 +232,9 @@ class MagicMachine(object):
 			else:
 				command = raw_input(prompt)
 
-				while command.split()[0] in self.ADMIN_COMMANDS:
-					split = command.split()
-					getattr(self, "admin_%s" % split[0])(*split[1:])
-					command = raw_input(prompt)
+			if command.split()[0] in self.ADMIN_COMMANDS:
+				split = command.split()
+				getattr(self, "admin_%s" % split[0])(*split[1:])
 
 			self.input_buffer = (c for c in command)
 
