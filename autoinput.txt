@@ -69,3 +69,20 @@ look journal
 west
 north
 north
+take orb
+north
+east
+east
+north
+west
+south
+east
+east
+west
+north
+north
+east
+vault
+take mirror
+use mirror
+quit

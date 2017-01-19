@@ -231,10 +231,12 @@ class MagicMachine(object):
 				print "(auto) %s%s" % (prompt, command)
 			else:
 				command = raw_input(prompt)
-
-			if command.split()[0] in self.ADMIN_COMMANDS:
-				split = command.split()
-				getattr(self, "admin_%s" % split[0])(*split[1:])
+			
+			for ac in self.ADMIN_COMMANDS:
+				if command.startswith(ac):
+					cmd = getattr(self, "admin_%s" % ac.replace(' ', '_'))
+					cmd_args = command[len(ac) + 1:].split()
+					cmd(*cmd_args)
 
 			self.input_buffer = (c for c in command)
 

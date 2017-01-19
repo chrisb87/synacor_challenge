@@ -9,7 +9,7 @@ class MagicMachine
 	}
 
 	ADMIN_COMMANDS = [
-		'quit', 'registers', 'set register', 'fix teleporter'
+		'quit', 'registers', 'set register', 'fix teleporter', 'stack', 'memdump'
 	]
 
 	attr_reader :memory, :registers, :stack
@@ -50,7 +50,7 @@ class MagicMachine
 
 		while @address < @memory.length
 			opaddr = @address
-			opnum = @memory[@address]
+			opnum = @memory[opaddr]
 			opname = OPCODES[opnum]
 			operation = method("op_#{opname}")
 			opargs = []
@@ -65,6 +65,60 @@ class MagicMachine
 				@address += 1 if ret != 'jmp'
 			rescue Halt
 				break
+			end
+		end
+	end
+
+	def admin_memdump
+		n = 0
+
+		while true
+			filename = "memdumps/memdump_%04d.txt" % n
+			break unless File.exist?(filename)
+			n += 1
+		end
+
+		File.open(filename, 'w') do |file|
+			address = 0
+
+			while address < self.memory.length
+				opaddr = address
+				opnum = @memory[address]
+				opname = OPCODES[opnum] || opnum
+				operation = method("op_#{opname}") rescue nil
+				opargs = []
+
+				if operation
+					operation.arity.times do
+						address += 1
+						opargs << @memory[address]
+					end
+				else
+					
+					if opnum < 256
+						start_string = address
+						end_string = address
+
+						while @memory[end_string] < 256
+							end_string += 1
+							address += 1
+						end
+
+						opname = "<string>"
+						opargs = @memory[start_string...end_string]
+					end
+				end
+
+				if ['out', '<string>'].include?(opname)
+					opargs.map!{ |a| (a >= 32 && a <= 126) ? a.chr : a }
+					opargs = opargs.join('')
+				else
+					opargs.map!{ |a| a >= (2**15) ? "reg%d" % (a % 2**15) : a }
+					opargs = opargs.join(' ')
+				end
+
+				file.write("%05d #{opname} #{opargs}\n" % opaddr)
+				address += 1
 			end
 		end
 	end
@@ -91,6 +145,10 @@ class MagicMachine
 
 	def admin_set_register(regnum, val)
 		op_set(regnum.to_i, val.to_i)
+	end
+
+	def admin_stack
+		puts @stack.inspect
 	end
 
 	def admin_fix_teleporter
