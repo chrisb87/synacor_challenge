@@ -38,7 +38,7 @@ def solve():
 
 def cost(path):
 	"""length of existing path plus distance to (3,3)"""
-	return len(path) + (3 - path[-1][0]) + (3 - path[-1][0])
+	return len(path) + (3 - path[-1][0]) + (3 - path[-1][1])
 
 def computevalue(path):
 	"""converts path to expression and computes it left to right"""
